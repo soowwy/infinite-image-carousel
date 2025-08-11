@@ -8,7 +8,7 @@ export interface Image {
 
 export const fetchImages = async (
   page: number,
-  count = 10
+  count = 30
 ): Promise<Image[]> => {
   const controller = new AbortController();
   try {

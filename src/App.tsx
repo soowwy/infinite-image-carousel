@@ -1,9 +1,8 @@
 import "./App.css";
-// import InfiniteImageCarousel from "./components/Carousel/InfiniteImageCarousel";
-import Test from "./components/Carousel/Test";
+import InfiniteImageCarousel from "./components/Carousel/InfiniteImageCarousel";
 
 function App() {
-  return <Test />;
+  return <InfiniteImageCarousel />;
 }
 
 export default App;
