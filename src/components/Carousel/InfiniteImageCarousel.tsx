@@ -9,13 +9,13 @@ import { fetchImages } from "../../api/imagesApi";
 import type { Image } from "../../api/imagesApi";
 import { useLazyLoadImages } from "../../hooks/useLazyLoadImages";
 import { useBatchSpan } from "../../hooks/useBatchSpan";
-import "./InfiniteImageCarousel.css";
+import "./InfiniteImageCarousel.scss";
 
+// The limit of images loaded in the DOM is controlled by multiplying the PAGE_SIZE and MAX_BATCHES constants.
 const PAGE_SIZE = 10;
 const MAX_BATCHES = 6;
-const INITIAL_PAGE = 50;
+const INITIAL_PAGE = 10;
 
-// State to manage scroll adjustments
 type ScrollAdjustmentState = {
   side: "left" | "right";
   isPruning: boolean;
@@ -29,6 +29,7 @@ const InfiniteImageCarousel: React.FC = () => {
 
   const galleryRef = useRef<HTMLDivElement>(null);
   const isFetching = useRef(false);
+  const inFlightDir = useRef<null | "left" | "right">(null);
   const lastScrollX = useRef(0);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ignoreNextScroll = useRef(false);
@@ -36,10 +37,8 @@ const InfiniteImageCarousel: React.FC = () => {
   const nextPageLeft = useRef(INITIAL_PAGE - 1);
 
   const measureSpan = useBatchSpan(galleryRef.current);
-
   useLazyLoadImages(galleryRef.current, [photos]);
 
-  // Toggle smooth scrolling without useState
   const toggleSmooth = (enable: boolean) => {
     const el = galleryRef.current;
     if (!el) return;
@@ -47,52 +46,52 @@ const InfiniteImageCarousel: React.FC = () => {
     else el.classList.add("nosmooth");
   };
 
-  const fetchMoreImages = useCallback(
-    async (side: "left" | "right") => {
-      if (isFetching.current) return;
-      isFetching.current = true;
+  const fetchMoreImages = useCallback(async (side: "left" | "right") => {
+    if (isFetching.current || inFlightDir.current === side) return;
+    isFetching.current = true;
+    inFlightDir.current = side;
 
-      try {
-        const page =
-          side === "right" ? nextPageRight.current : nextPageLeft.current;
-        const batch = await fetchImages(page, PAGE_SIZE);
+    try {
+      const page =
+        side === "right" ? nextPageRight.current : nextPageLeft.current;
+      const batch = await fetchImages(page, PAGE_SIZE);
 
-        if (side === "right") nextPageRight.current += 1;
-        else nextPageLeft.current = Math.max(1, nextPageLeft.current - 1);
+      if (side === "right") nextPageRight.current += 1;
+      else nextPageLeft.current = Math.max(1, nextPageLeft.current - 1);
 
-        setPhotos((prev) => {
-          const withKeys = batch.map((img, i) => ({
-            ...img,
-            _key: `${img.id}-${i}`,
-          }));
-          let updated =
-            side === "right" ? [...prev, ...withKeys] : [...withKeys, ...prev];
+      setPhotos((prev) => {
+        const withKeys = batch.map((img, i) => ({
+          ...img,
+          _key: `${img.id}-${page}-${i}`, // include page for stability
+        }));
+        let updated =
+          side === "right" ? [...prev, ...withKeys] : [...withKeys, ...prev];
 
-          let didPrune = false;
-          if (updated.length > MAX_BATCHES * PAGE_SIZE) {
-            didPrune = true;
-            if (side === "right") {
-              updated = updated.slice(PAGE_SIZE);
-            } else {
-              updated = updated.slice(0, -PAGE_SIZE);
-            }
+        let didPrune = false;
+        if (updated.length > MAX_BATCHES * PAGE_SIZE) {
+          didPrune = true;
+          if (side === "right") {
+            updated = updated.slice(PAGE_SIZE);
+          } else {
+            updated = updated.slice(0, -PAGE_SIZE);
           }
+        }
 
-          if (didPrune || side === "left") {
-            setShouldAdjustScroll({ side, isPruning: didPrune });
-          }
+        if (didPrune || side === "left") {
+          setShouldAdjustScroll({ side, isPruning: didPrune });
+        }
 
-          return updated;
-        });
-      } finally {
-        isFetching.current = false;
-      }
-    },
-    [measureSpan]
-  );
+        return updated;
+      });
+    } finally {
+      isFetching.current = false;
+      inFlightDir.current = null;
+    }
+  }, []);
 
   const onScroll = useCallback(() => {
-    if (!galleryRef.current || ignoreNextScroll.current) return;
+    if (!galleryRef.current) return;
+    if (ignoreNextScroll.current) return;
 
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
@@ -100,7 +99,7 @@ const InfiniteImageCarousel: React.FC = () => {
       const x = el.scrollLeft;
       const maxX = el.scrollWidth - el.clientWidth;
       const distRight = maxX - x;
-      const threshold = measureSpan("start", 1) * 2; // 2 cards width
+      const threshold = Math.max(1, measureSpan(1)) * 2; // 2 cards width
       const direction: "left" | "right" =
         x > lastScrollX.current ? "right" : "left";
       lastScrollX.current = x;
@@ -118,15 +117,24 @@ const InfiniteImageCarousel: React.FC = () => {
   useLayoutEffect(() => {
     if (!galleryRef.current || !shouldAdjustScroll) return;
     const el = galleryRef.current;
+
+    ignoreNextScroll.current = true;
+
     toggleSmooth(false);
 
     if (shouldAdjustScroll.side === "right" && shouldAdjustScroll.isPruning) {
-      el.scrollLeft -= measureSpan("start", PAGE_SIZE);
+      el.scrollLeft -= measureSpan(PAGE_SIZE);
     } else if (shouldAdjustScroll.side === "left") {
-      el.scrollLeft += measureSpan("start", PAGE_SIZE);
+      el.scrollLeft += measureSpan(PAGE_SIZE);
     }
 
-    toggleSmooth(true);
+    lastScrollX.current = el.scrollLeft;
+
+    requestAnimationFrame(() => {
+      toggleSmooth(true);
+      ignoreNextScroll.current = false;
+    });
+
     setShouldAdjustScroll(null);
   }, [shouldAdjustScroll, measureSpan]);
 
@@ -180,6 +188,7 @@ const InfiniteImageCarousel: React.FC = () => {
               alt={`Random image ${idx + 1}`}
               className="lazy-image"
               loading="lazy"
+              onLoad={(e) => e.currentTarget.classList.add("loaded")}
             />
           </div>
         ))}

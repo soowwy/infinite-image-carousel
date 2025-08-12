@@ -1,4 +1,4 @@
-import "./App.css";
+import "./App.scss";
 import InfiniteImageCarousel from "./components/Carousel/InfiniteImageCarousel";
 
 function App() {
