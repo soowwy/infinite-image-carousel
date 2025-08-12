@@ -1,4 +1,6 @@
-import { PICSUM_BASE_URL } from "../config/endpoints";
+// There was a last minute change - I've replaced PICSUM with PEXELS since PICSUM's response was waaaay to slow and it was making my life miserable.
+// The only thing that PEXELS required was an API KEY, generated on registration, i've added it so we dont need more registrations for now.
+import { PEXELS_BASE_URL, PEXELS_KEY } from "../config/endpoints";
 
 export interface Image {
   id: string;
@@ -10,22 +12,29 @@ export const fetchImages = async (
   page: number,
   count = 30
 ): Promise<Image[]> => {
-  const controller = new AbortController();
   try {
     const res = await fetch(
-      `${PICSUM_BASE_URL}/v2/list?page=${page}&limit=${count}`,
+      `${PEXELS_BASE_URL}/curated?page=${page}&per_page=${count}`,
       {
-        signal: controller.signal,
+        headers: {
+          Authorization: PEXELS_KEY!,
+        },
       }
     );
-    if (!res.ok) throw new Error(`Error fetching images: ${res.status}`);
+
+    if (!res.ok) {
+      throw new Error(`Error fetching images: ${res.status}`);
+    }
+
     const data = await res.json();
-    return data.map((img: any) => ({
+
+    return data.photos.map((img: any) => ({
       id: String(img.id),
-      url: img.download_url as string,
+      url: img.src.large as string,
       page,
     }));
-  } finally {
-    controller.abort(); // ensure no leaked network activity
+  } catch (error) {
+    console.error("Fetch failed:", error);
+    throw error;
   }
 };

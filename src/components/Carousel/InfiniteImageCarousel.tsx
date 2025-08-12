@@ -14,7 +14,7 @@ import "./InfiniteImageCarousel.scss";
 // The limit of images loaded in the DOM is controlled by multiplying the PAGE_SIZE and MAX_BATCHES constants.
 const PAGE_SIZE = 10;
 const MAX_BATCHES = 6;
-const INITIAL_PAGE = 10;
+const INITIAL_PAGE = 50;
 
 type ScrollAdjustmentState = {
   side: "left" | "right";
