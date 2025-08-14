@@ -11,17 +11,30 @@ import { useLazyLoadImages } from "../../hooks/useLazyLoadImages";
 import { useBatchSpan } from "../../hooks/useBatchSpan";
 import "./InfiniteImageCarousel.scss";
 
-// The limit of images loaded in the DOM is controlled by multiplying the PAGE_SIZE and MAX_BATCHES constants.
-const PAGE_SIZE = 10;
-const MAX_BATCHES = 6;
-const INITIAL_PAGE = 50;
+// Defaults (still used if no props are passed)
+const PAGE_SIZE_DEFAULT = 10;
+const MAX_BATCHES_DEFAULT = 6;
+const INITIAL_PAGE_DEFAULT = 50;
 
 type ScrollAdjustmentState = {
   side: "left" | "right";
   isPruning: boolean;
 } | null;
 
-const InfiniteImageCarousel: React.FC = () => {
+// ✅ Minimal reusability: optional overrides + custom fetcher
+type Props = Partial<{
+  pageSize: number;
+  maxBatches: number;
+  initialPage: number;
+  fetcher: (page: number, count: number) => Promise<Image[]>;
+}>;
+
+const InfiniteImageCarousel: React.FC<Props> = ({
+  pageSize = PAGE_SIZE_DEFAULT,
+  maxBatches = MAX_BATCHES_DEFAULT,
+  initialPage = INITIAL_PAGE_DEFAULT,
+  fetcher = fetchImages,
+}) => {
   const [photos, setPhotos] = useState<(Image & { _key: string })[]>([]);
   const [shouldAdjustScroll, setShouldAdjustScroll] =
     useState<ScrollAdjustmentState>(null);
@@ -33,8 +46,8 @@ const InfiniteImageCarousel: React.FC = () => {
   const lastScrollX = useRef(0);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ignoreNextScroll = useRef(false);
-  const nextPageRight = useRef(INITIAL_PAGE + 1);
-  const nextPageLeft = useRef(INITIAL_PAGE - 1);
+  const nextPageRight = useRef(initialPage + 1);
+  const nextPageLeft = useRef(initialPage - 1);
 
   const measureSpan = useBatchSpan(galleryRef.current);
   useLazyLoadImages(galleryRef.current, [photos]);
@@ -46,48 +59,52 @@ const InfiniteImageCarousel: React.FC = () => {
     else el.classList.add("nosmooth");
   };
 
-  const fetchMoreImages = useCallback(async (side: "left" | "right") => {
-    if (isFetching.current || inFlightDir.current === side) return;
-    isFetching.current = true;
-    inFlightDir.current = side;
+  const fetchMoreImages = useCallback(
+    async (side: "left" | "right") => {
+      if (isFetching.current || inFlightDir.current === side) return;
+      isFetching.current = true;
+      inFlightDir.current = side;
 
-    try {
-      const page =
-        side === "right" ? nextPageRight.current : nextPageLeft.current;
-      const batch = await fetchImages(page, PAGE_SIZE);
+      try {
+        const page =
+          side === "right" ? nextPageRight.current : nextPageLeft.current;
 
-      if (side === "right") nextPageRight.current += 1;
-      else nextPageLeft.current = Math.max(1, nextPageLeft.current - 1);
+        const batch = await fetcher(page, pageSize);
 
-      setPhotos((prev) => {
-        const withKeys = batch.map((img, i) => ({
-          ...img,
-          _key: `${img.id}-${page}-${i}`, // include page for stability
-        }));
-        let updated =
-          side === "right" ? [...prev, ...withKeys] : [...withKeys, ...prev];
+        if (side === "right") nextPageRight.current += 1;
+        else nextPageLeft.current = Math.max(1, nextPageLeft.current - 1);
 
-        let didPrune = false;
-        if (updated.length > MAX_BATCHES * PAGE_SIZE) {
-          didPrune = true;
-          if (side === "right") {
-            updated = updated.slice(PAGE_SIZE);
-          } else {
-            updated = updated.slice(0, -PAGE_SIZE);
+        setPhotos((prev) => {
+          const withKeys = batch.map((img, i) => ({
+            ...img,
+            _key: `${img.id}-${page}-${i}`, // include page for stability
+          }));
+          let updated =
+            side === "right" ? [...prev, ...withKeys] : [...withKeys, ...prev];
+
+          let didPrune = false;
+          if (updated.length > maxBatches * pageSize) {
+            didPrune = true;
+            if (side === "right") {
+              updated = updated.slice(pageSize);
+            } else {
+              updated = updated.slice(0, -pageSize);
+            }
           }
-        }
 
-        if (didPrune || side === "left") {
-          setShouldAdjustScroll({ side, isPruning: didPrune });
-        }
+          if (didPrune || side === "left") {
+            setShouldAdjustScroll({ side, isPruning: didPrune });
+          }
 
-        return updated;
-      });
-    } finally {
-      isFetching.current = false;
-      inFlightDir.current = null;
-    }
-  }, []);
+          return updated;
+        });
+      } finally {
+        isFetching.current = false;
+        inFlightDir.current = null;
+      }
+    },
+    [fetcher, pageSize, maxBatches]
+  );
 
   const onScroll = useCallback(() => {
     if (!galleryRef.current) return;
@@ -119,13 +136,12 @@ const InfiniteImageCarousel: React.FC = () => {
     const el = galleryRef.current;
 
     ignoreNextScroll.current = true;
-
     toggleSmooth(false);
 
     if (shouldAdjustScroll.side === "right" && shouldAdjustScroll.isPruning) {
-      el.scrollLeft -= measureSpan(PAGE_SIZE);
+      el.scrollLeft -= measureSpan(pageSize);
     } else if (shouldAdjustScroll.side === "left") {
-      el.scrollLeft += measureSpan(PAGE_SIZE);
+      el.scrollLeft += measureSpan(pageSize);
     }
 
     lastScrollX.current = el.scrollLeft;
@@ -136,14 +152,14 @@ const InfiniteImageCarousel: React.FC = () => {
     });
 
     setShouldAdjustScroll(null);
-  }, [shouldAdjustScroll, measureSpan]);
+  }, [shouldAdjustScroll, measureSpan, pageSize]);
 
   // Initial load
   useEffect(() => {
     const initialFetch = async () => {
       try {
         setLoading(true);
-        const initial = await fetchImages(INITIAL_PAGE, PAGE_SIZE);
+        const initial = await fetcher(initialPage, pageSize);
         setPhotos(
           initial.map((img, i) => ({
             ...img,
@@ -155,7 +171,7 @@ const InfiniteImageCarousel: React.FC = () => {
       }
     };
     initialFetch();
-  }, []);
+  }, [fetcher, initialPage, pageSize]);
 
   useEffect(() => {
     return () => {

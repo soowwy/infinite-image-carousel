@@ -1,69 +1,68 @@
-# React + TypeScript + Vite
+# Infinite Image Carousel
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This project is a technical assessment task to build an infinite image carousel using React. The component fetches images from a public API and displays them in a continuously scrolling gallery.
 
-Currently, two official plugins are available:
+# Getting Started
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+To run this project locally, follow these steps:
 
-## Expanding the ESLint configuration
+# Prerequisites
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Make sure you have the following installed:
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- [Node.js](https://nodejs.org/) (latest version recommended)
+- npm (comes with Node.js)
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+# Clone the repository:
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+git clone https://github.com/soowwy/infinite-image-carousel.git
+cd infinite-image-carousel
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+# Install dependencies:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+npm install
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+# or
+
+yarn install
+
+# Run the development server:
+
+npm run dev
+
+# or
+
+yarn dev
+The application will be available at http://localhost:5173.
+
+# To run tests:
+
+npm run test
+
+# or
+
+rpm run test:ui
+
+# Key Features
+
+Infinite Scrolling Logic: The carousel uses a "pruning" technique to manage a fixed number of images in the DOM. When new images are fetched and added, old images are removed from the opposite end, maintaining performance and memory efficiency.
+
+Precise Scroll Adjustment: The component uses useLayoutEffect to make synchronous scroll adjustments. This prevents visual "jumps" and ensures the user's current position remains stable after images are added or removed.
+
+Lazy Loading: Images are loaded on demand as they enter the viewport, reducing initial load times and bandwidth usage.
+
+Unit Testing: The component's core functionality is verified with a unit test using Vitest and React Testing Library, ensuring the infinite scrolling and fetch logic works as expected.
+
+# Tech Stack
+
+React: The core library for building the user interface.
+
+TypeScript: Provides static typing for improved code quality and maintainability.
+
+Vite: A fast development server and build tool.
+
+Sass: Used for modular and maintainable CSS styling.
+
+Vitest: A modern testing framework for unit and component testing.
+
+picsum.photos API: The public API used to fetch placeholder images.
