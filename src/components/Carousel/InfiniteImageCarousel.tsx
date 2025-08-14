@@ -11,7 +11,7 @@ import { useLazyLoadImages } from "../../hooks/useLazyLoadImages";
 import { useBatchSpan } from "../../hooks/useBatchSpan";
 import "./InfiniteImageCarousel.scss";
 
-// Defaults (still used if no props are passed)
+// The limit of images loaded in the DOM is controlled by multiplying the PAGE_SIZE and MAX_BATCHES constants.
 const PAGE_SIZE_DEFAULT = 10;
 const MAX_BATCHES_DEFAULT = 6;
 const INITIAL_PAGE_DEFAULT = 50;
@@ -21,7 +21,6 @@ type ScrollAdjustmentState = {
   isPruning: boolean;
 } | null;
 
-// ✅ Minimal reusability: optional overrides + custom fetcher
 type Props = Partial<{
   pageSize: number;
   maxBatches: number;
@@ -33,7 +32,7 @@ const InfiniteImageCarousel: React.FC<Props> = ({
   pageSize = PAGE_SIZE_DEFAULT,
   maxBatches = MAX_BATCHES_DEFAULT,
   initialPage = INITIAL_PAGE_DEFAULT,
-  fetcher = fetchImages,
+  fetcher = fetchImages, // We can pass any hook or fetch with another API or the default one as long as it returns the array of images.
 }) => {
   const [photos, setPhotos] = useState<(Image & { _key: string })[]>([]);
   const [shouldAdjustScroll, setShouldAdjustScroll] =
@@ -77,7 +76,7 @@ const InfiniteImageCarousel: React.FC<Props> = ({
         setPhotos((prev) => {
           const withKeys = batch.map((img, i) => ({
             ...img,
-            _key: `${img.id}-${page}-${i}`, // include page for stability
+            _key: `${img.id}-${page}-${i}`,
           }));
           let updated =
             side === "right" ? [...prev, ...withKeys] : [...withKeys, ...prev];
